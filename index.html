@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cubo 4×4 • Simulación</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['JetBrains Mono', 'monospace'],
+            sans: ['Inter', 'system-ui', 'sans-serif']
+          },
+          colors: {
+            // PANTONE 655 C (Azul institucional)
+            p655: {
+              DEFAULT: '#002654',
+              dark: '#001a3a',
+              light: '#083670',
+              border: '#153f78'
+            },
+            // PANTONE 1245 C (Dorado institucional)
+            p1245: {
+              DEFAULT: '#C69214',
+              hover: '#D9A31E',
+              dark: '#A6790E',
+              text: '#001e40'
+            },
+            // Fondo gris claro descansado para la vista
+            canvasBg: '#D1D5DB'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      overflow: hidden;
+      user-select: none;
+    }
+    .move-btn {
+      padding: 0.28rem 0.55rem;
+      border-radius: 0.25rem;
+      background-color: #002654;
+      border: 1px solid #153f78;
+      font-family: monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #f8fafc;
+      transition: all 0.12s ease;
+    }
+    .move-btn:hover {
+      background-color: #083670;
+      border-color: #C69214;
+      color: #C69214;
+      transform: translateY(-1px);
+    }
+    .move-btn:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body class="bg-canvasBg text-slate-800 font-sans h-screen w-screen flex flex-col antialiased">
+
+  <!-- Barra superior (PANTONE 655 C) -->
+  <header class="h-12 border-b border-p655-border bg-p655 px-5 flex items-center justify-between z-20 shrink-0 shadow-md">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-6 h-6 rounded bg-p1245 text-p1245-text font-bold text-xs flex items-center justify-center shadow">
+        4×4
+      </div>
+      <span class="text-xs font-semibold tracking-wider text-slate-100 uppercase">Simulación 4×4</span>
+    </div>
+
+    <!-- Botones de acción (PANTONE 1245 C) -->
+    <div class="flex items-center space-x-2.5">
+      <button id="btn-reset-cube" class="px-3.5 py-1.5 rounded bg-p655-light hover:bg-p655-border border border-p655-border text-xs font-medium text-slate-200 transition">
+        Reiniciar
+      </button>
+
+      <button id="btn-solve-cube" class="px-3.5 py-1.5 rounded bg-p1245 hover:bg-p1245-hover text-p1245-text font-bold text-xs shadow flex items-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        <span>Resolver</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Espacio central: Fondo claro suave no deslumbrante (#EBF0F6) -->
+  <div class="flex-1 flex overflow-hidden relative">
+    <main class="flex-1 relative overflow-hidden flex flex-col bg-canvasBg">
+      <div id="cube-canvas-container" class="absolute inset-0 cursor-grab active:cursor-grabbing bg-canvasBg"></div>
+
+      <!-- Cronómetro flotante superior en zona PANTONE 655 C -->
+      <div class="absolute top-4 inset-x-0 mx-auto w-fit pointer-events-none z-10 flex flex-col items-center">
+        <div class="bg-p655/95 backdrop-blur-md px-5 py-1.5 rounded-xl border border-p655-border shadow-xl flex flex-col items-center">
+          <div id="timer-display" class="font-mono text-4xl font-bold tracking-tight text-white drop-shadow">
+            0.000
+          </div>
+          <div id="timer-status" class="text-[11px] font-medium text-slate-300 mt-0.5">
+            Mantén ESPACIO para preparar
+          </div>
+        </div>
+      </div>
+
+      <!-- Paleta flotante de movimientos WCA en zona PANTONE 655 C -->
+      <div class="absolute bottom-6 inset-x-0 mx-auto w-fit z-10 bg-p655/95 backdrop-blur-md px-3 py-2 rounded-lg border border-p655-border shadow-2xl flex flex-col items-center gap-1.5">
+        <div class="flex gap-1">
+          <button data-move="U" class="move-btn">U</button>
+          <button data-move="U'" class="move-btn">U'</button>
+          <button data-move="D" class="move-btn">D</button>
+          <button data-move="D'" class="move-btn">D'</button>
+          <button data-move="R" class="move-btn">R</button>
+          <button data-move="R'" class="move-btn">R'</button>
+          <button data-move="L" class="move-btn">L</button>
+          <button data-move="L'" class="move-btn">L'</button>
+          <button data-move="F" class="move-btn">F</button>
+          <button data-move="F'" class="move-btn">F'</button>
+          <button data-move="B" class="move-btn">B</button>
+          <button data-move="B'" class="move-btn">B'</button>
+        </div>
+        <div class="flex gap-1">
+          <button data-move="Uw" class="move-btn text-p1245">Uw</button>
+          <button data-move="Uw'" class="move-btn text-p1245">Uw'</button>
+          <button data-move="Dw" class="move-btn text-p1245">Dw</button>
+          <button data-move="Dw'" class="move-btn text-p1245">Dw'</button>
+          <button data-move="Rw" class="move-btn text-p1245">Rw</button>
+          <button data-move="Rw'" class="move-btn text-p1245">Rw'</button>
+          <button data-move="Lw" class="move-btn text-p1245">Lw</button>
+          <button data-move="Lw'" class="move-btn text-p1245">Lw'</button>
+          <button data-move="Fw" class="move-btn text-p1245">Fw</button>
+          <button data-move="Fw'" class="move-btn text-p1245">Fw'</button>
+          <button data-move="2R" class="move-btn text-amber-300">2R</button>
+          <button data-move="2U" class="move-btn text-amber-300">2U</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Barra inferior (PANTONE 655 C) -->
+  <footer class="h-14 border-t border-p655-border bg-p655 px-5 flex items-center justify-between gap-4 z-20 shrink-0 shadow-inner">
+    <div class="flex items-center space-x-2.5">
+      <!-- Botón Mezclar (PANTONE 1245 C) -->
+      <button id="btn-scramble" class="px-3.5 py-1.5 bg-p1245 hover:bg-p1245-hover active:scale-95 transition rounded text-xs font-bold text-p1245-text shadow flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span>Mezclar</span>
+      </button>
+
+      <div class="flex items-center space-x-1 bg-p655-dark px-2 py-1 rounded border border-p655-border text-xs">
+        <span class="text-slate-300 text-[11px]">Movs:</span>
+        <input id="scramble-length" type="number" min="10" max="80" value="40" class="w-10 bg-transparent text-center text-xs font-mono font-bold text-p1245 focus:outline-none">
+      </div>
+
+      <div id="scramble-display" class="font-mono text-xs text-slate-200 bg-p655-dark px-3 py-1.5 rounded border border-p655-border max-w-xl truncate cursor-pointer hover:border-p1245 transition" title="Copiar mezcla">
+        Cubo Resuelto
+      </div>
+    </div>
+
+    <!-- Ejecución manual de algoritmos con botón (PANTONE 1245 C) -->
+    <div class="flex items-center space-x-2">
+      <input id="algo-input" type="text" placeholder="Ej: Rw U2 Rw' F2" class="w-56 bg-p655-dark border border-p655-border rounded px-2.5 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-400 focus:outline-none focus:border-p1245">
+      <button id="btn-play-algo" class="px-3 py-1.5 bg-p1245 hover:bg-p1245-hover rounded text-xs font-bold text-p1245-text shadow transition">
+        Ejecutar
+      </button>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
