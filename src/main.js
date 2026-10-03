@@ -19,6 +19,10 @@ window.addEventListener('DOMContentLoaded', () => {
   let solverWorker = null;
   try {
     solverWorker = new Worker(new URL('./solver/solver.worker.js', import.meta.url), { type: 'module' });
+    solverWorker.onerror = (err) => {
+      console.warn('Worker no disponible, fallback al hilo principal:', err);
+      solverWorker = null;
+    };
   } catch (err) {
     console.warn('Worker fallback:', err);
   }
