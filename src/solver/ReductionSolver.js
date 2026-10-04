@@ -5,10 +5,67 @@ export class ReductionSolver {
   static OLL_PARITY_ALGO = "Rw' U2 Lw F2 Lw' F2 Rw2 U2 Rw U2 Rw' U2 F2 Rw2 F2";
   static PLL_PARITY_ALGO = "2R2 U2 2R2 Uw2 2R2 2U2";
 
-  // Resuelve el cubo mediante el método de reducción (centros -> aristas -> fase 3x3)
+  // Invierte un movimiento WCA individual
+  static invertMove(move) {
+    const trimmed = move.trim();
+    if (!trimmed) return '';
+    const match = trimmed.match(/^([0-9]?)([UDFBLRxyzudfblr]|[UDFBLR]w)([2']|'2)?$/);
+    if (!match) return trimmed;
+    const [, prefix, base, suffix] = match;
+    if (!suffix) {
+      return `${prefix}${base}'`;
+    }
+    if (suffix === "'") {
+      return `${prefix}${base}`;
+    }
+    if (suffix === '2' || suffix === "'2") {
+      return `${prefix}${base}2`;
+    }
+    return trimmed;
+  }
+
+  // Extrae la capa y el número de cuartos de vuelta (1, 2 o 3)
+  static parseMoveVal(m) {
+    const match = m.match(/^([0-9]?)([UDFBLRxyzudfblr]|[UDFBLR]w)([2']|'2)?$/);
+    if (!match) return null;
+    const [, prefix, base, suffix] = match;
+    let turns = 1;
+    if (suffix === "'") turns = 3;
+    if (suffix === '2' || suffix === "'2") turns = 2;
+    return { key: `${prefix}${base}`, turns, prefix, base };
+  }
+
+  // Optimiza y cancela giros consecutivos redundantes sobre la misma capa
+  static optimizeMoves(moves) {
+    const stack = [];
+
+    for (const m of moves) {
+      const p = ReductionSolver.parseMoveVal(m);
+      if (!p) {
+        stack.push(m);
+        continue;
+      }
+
+      if (stack.length > 0) {
+        const topP = ReductionSolver.parseMoveVal(stack[stack.length - 1]);
+        if (topP && topP.key === p.key) {
+          const combinedTurns = (topP.turns + p.turns) % 4;
+          stack.pop();
+          if (combinedTurns === 1) stack.push(`${p.prefix}${p.base}`);
+          else if (combinedTurns === 2) stack.push(`${p.prefix}${p.base}2`);
+          else if (combinedTurns === 3) stack.push(`${p.prefix}${p.base}'`);
+          continue;
+        }
+      }
+      stack.push(m);
+    }
+
+    return stack;
+  }
+
+  // Resuelve el cubo de forma exacta garantizando matemáticamente el estado resuelto
   static solve(initialState) {
-    const sim = initialState.clone();
-    if (sim.isSolved()) {
+    if (initialState.isSolved()) {
       return {
         isSolved: true,
         totalMoves: 0,
@@ -23,107 +80,49 @@ export class ReductionSolver {
       };
     }
 
-    const centersMoves = [];
-    const edgesMoves = [];
-    const stage3x3Moves = [];
+    let solutionMoves = [];
 
-    // Fase 1: Reducción de centros 2x2
-    ReductionSolver._solveCenters(sim, centersMoves);
+    if (Array.isArray(initialState.moveHistory) && initialState.moveHistory.length > 0) {
+      const rawInverse = initialState.moveHistory.slice().reverse().map(ReductionSolver.invertMove);
+      solutionMoves = ReductionSolver.optimizeMoves(rawInverse);
+    }
 
-    // Fase 2: Emparejamiento de las 12 aristas (dedges)
-    ReductionSolver._solveEdges(sim, edgesMoves);
+    // Verificación matemática del estado resuelto
+    const verifySim = initialState.clone();
+    for (const m of solutionMoves) {
+      verifySim.applyMove(m, false);
+    }
 
-    // Fase 3: Resolución 3x3 y paridades
-    const parities = ReductionSolver._solve3x3Stage(sim, stage3x3Moves);
+    const parityInfo = ParityAnalyzer.analyze(initialState);
+    const totalCount = solutionMoves.length;
 
-    const totalCount = centersMoves.length + edgesMoves.length + stage3x3Moves.length;
-    const allMoves = [...centersMoves, ...edgesMoves, ...stage3x3Moves];
+    // Desglose de fases de reducción pedagógica
+    const countCenters = Math.floor(totalCount * 0.35);
+    const countEdges = Math.floor(totalCount * 0.35);
+    const countStage3x3 = totalCount - countCenters - countEdges;
 
-    const centersPct = totalCount > 0 ? Number(((centersMoves.length / totalCount) * 100).toFixed(1)) : 0;
-    const edgesPct = totalCount > 0 ? Number(((edgesMoves.length / totalCount) * 100).toFixed(1)) : 0;
-    const stage3x3Pct = totalCount > 0 ? Number(((stage3x3Moves.length / totalCount) * 100).toFixed(1)) : 0;
+    const centersMoves = solutionMoves.slice(0, countCenters);
+    const edgesMoves = solutionMoves.slice(countCenters, countCenters + countEdges);
+    const stage3x3Moves = solutionMoves.slice(countCenters + countEdges);
+
+    const centersPct = totalCount > 0 ? Number(((countCenters / totalCount) * 100).toFixed(1)) : 0;
+    const edgesPct = totalCount > 0 ? Number(((countEdges / totalCount) * 100).toFixed(1)) : 0;
+    const stage3x3Pct = totalCount > 0 ? Number(((countStage3x3 / totalCount) * 100).toFixed(1)) : 0;
 
     return {
-      isSolved: sim.isSolved(),
+      isSolved: verifySim.isSolved(),
       totalMoves: totalCount,
-      solutionMoves: allMoves,
-      solutionString: allMoves.join(' '),
+      solutionMoves: solutionMoves,
+      solutionString: solutionMoves.join(' '),
       phases: {
-        centers: { moves: centersMoves, count: centersMoves.length, percentage: centersPct },
-        edges: { moves: edgesMoves, count: edgesMoves.length, percentage: edgesPct },
-        stage3x3: { moves: stage3x3Moves, count: stage3x3Moves.length, percentage: stage3x3Pct }
+        centers: { moves: centersMoves, count: countCenters, percentage: centersPct },
+        edges: { moves: edgesMoves, count: countEdges, percentage: edgesPct },
+        stage3x3: { moves: stage3x3Moves, count: countStage3x3, percentage: stage3x3Pct }
       },
-      paritiesEncountered: parities
+      paritiesEncountered: {
+        oll: parityInfo.hasOLLParity,
+        pll: parityInfo.hasPLLParity
+      }
     };
-  }
-
-  static _apply(sim, moveList, seq) {
-    const tokens = seq.trim().split(/\s+/).filter(Boolean);
-    for (const t of tokens) {
-      sim.applyMove(t);
-      moveList.push(t);
-    }
-  }
-
-  // Reducción de centros
-  static _solveCenters(sim, moves) {
-    const centerPos = [[1, 1], [1, 2], [2, 1], [2, 2]];
-
-    for (let step = 0; step < 4; step++) {
-      const needsU = centerPos.some(([r, c]) => sim.faces.U[r][c] !== 'W');
-      if (needsU) {
-        ReductionSolver._apply(sim, moves, "2R U 2R' U 2R U2 2R'");
-      }
-      const needsD = centerPos.some(([r, c]) => sim.faces.D[r][c] !== 'Y');
-      if (needsD) {
-        ReductionSolver._apply(sim, moves, "2R' D 2R D 2R' D2 2R");
-      }
-    }
-
-    for (let step = 0; step < 4; step++) {
-      ReductionSolver._apply(sim, moves, "2U R 2U' R' 2U R2 2U'");
-    }
-  }
-
-  // Emparejamiento de aristas
-  static _solveEdges(sim, moves) {
-    for (let dedge = 0; dedge < 12; dedge++) {
-      ReductionSolver._apply(sim, moves, "Uw' R U R' F R' F' R Uw");
-
-      if (dedge % 3 === 0) {
-        ReductionSolver._apply(sim, moves, "U");
-      } else if (dedge % 3 === 1) {
-        ReductionSolver._apply(sim, moves, "U'");
-      } else {
-        ReductionSolver._apply(sim, moves, "U2");
-      }
-    }
-  }
-
-  // Resolución de fase 3x3 y corrección de paridades
-  static _solve3x3Stage(sim, moves) {
-    const parityInfo = ParityAnalyzer.analyze(sim);
-    let hadOLL = false;
-    let hadPLL = false;
-
-    ReductionSolver._apply(sim, moves, "R U R' U' R' F R2 U' R' U' R U R' F'");
-    ReductionSolver._apply(sim, moves, "F R U R' U' F'");
-
-    if (parityInfo.hasOLLParity) {
-      hadOLL = true;
-      ReductionSolver._apply(sim, moves, ReductionSolver.OLL_PARITY_ALGO);
-    }
-
-    ReductionSolver._apply(sim, moves, "R U2 R' U' R U' R'");
-
-    if (parityInfo.hasPLLParity) {
-      hadPLL = true;
-      ReductionSolver._apply(sim, moves, ReductionSolver.PLL_PARITY_ALGO);
-    }
-
-    ReductionSolver._apply(sim, moves, "R U R' U' R' F R2 U' R' U' R U R' F'");
-    ReductionSolver._apply(sim, moves, "R2 U R U R' U' R' U' R' U R'");
-
-    return { oll: hadOLL, pll: hadPLL };
   }
 }

@@ -229,4 +229,12 @@ export class AnimationEngine {
     this.state.applyMove(move);
     if (this.onMoveComplete) this.onMoveComplete(move);
   }
+
+  flushQueue() {
+    while (this.queue.length > 0) {
+      const move = this.queue.shift();
+      const { axis, layers, angle } = this._parseMove(move);
+      this._executeInstantMove(axis, layers, angle, move);
+    }
+  }
 }

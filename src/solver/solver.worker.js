@@ -3,12 +3,15 @@ import { ReductionSolver } from './ReductionSolver.js';
 
 // Web Worker para ejecutar el cálculo del solver sin bloquear el renderizado
 self.onmessage = (e) => {
-  const { type, serializedState } = e.data;
+  const { type, serializedState, moveHistory } = e.data;
 
   if (type === 'SOLVE') {
     try {
       const state = new Rubik4x4State();
       state.deserialize(serializedState);
+      if (Array.isArray(moveHistory)) {
+        state.moveHistory = [...moveHistory];
+      }
 
       const startTime = performance.now();
       const result = ReductionSolver.solve(state);

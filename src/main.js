@@ -4,6 +4,7 @@ import { CubeRenderer } from './rendering/CubeRenderer.js';
 import { AnimationEngine } from './rendering/AnimationEngine.js';
 import { SpeedcubingTimer } from './ui/Timer.js';
 import { ReductionSolver } from './solver/ReductionSolver.js';
+import { ParityTracker } from './ui/ParityTracker.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   const rubikState = new Rubik4x4State();
@@ -11,6 +12,8 @@ window.addEventListener('DOMContentLoaded', () => {
   const cubeRenderer = new CubeRenderer(canvasContainer);
   const animEngine = new AnimationEngine(cubeRenderer, rubikState);
   animEngine.setSpeed(180);
+
+  const parityTracker = new ParityTracker(rubikState, animEngine, cubeRenderer);
 
   const timerDisplay = document.getElementById('timer-display');
   const timerStatus = document.getElementById('timer-status');
@@ -111,6 +114,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (animateSolution) {
       animEngine.clearQueue();
       animEngine.enqueue(result.solutionString);
+      animEngine.onQueueEmpty = () => {
+        rubikState.moveHistory = [];
+        scrambleDisplay.textContent = 'Cubo Resuelto';
+        animEngine.onQueueEmpty = null;
+      };
     }
   };
 
@@ -129,13 +137,18 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   btnSolveCube.addEventListener('click', () => {
+    if (animEngine.queue.length > 0) {
+      animEngine.flushQueue();
+    }
+
     btnSolveCube.classList.add('opacity-60', 'pointer-events-none');
     btnSolveCube.querySelector('span').textContent = 'Calculando...';
 
     if (solverWorker) {
       solverWorker.postMessage({
         type: 'SOLVE',
-        serializedState: rubikState.serialize()
+        serializedState: rubikState.serialize(),
+        moveHistory: rubikState.moveHistory
       });
     } else {
       const t0 = performance.now();
@@ -152,6 +165,7 @@ window.addEventListener('DOMContentLoaded', () => {
     renderer: cubeRenderer,
     animEngine,
     timer,
-    solver: ReductionSolver
+    solver: ReductionSolver,
+    parityTracker
   };
 });

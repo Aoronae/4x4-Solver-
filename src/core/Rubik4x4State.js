@@ -21,6 +21,7 @@ export class Rubik4x4State {
 
   constructor() {
     this.faces = {};
+    this.moveHistory = [];
     this.reset();
   }
 
@@ -29,6 +30,7 @@ export class Rubik4x4State {
       const color = Rubik4x4State.COLORS[face];
       this.faces[face] = Array.from({ length: 4 }, () => Array(4).fill(color));
     }
+    this.moveHistory = [];
   }
 
   clone() {
@@ -40,6 +42,7 @@ export class Rubik4x4State {
         }
       }
     }
+    next.moveHistory = Array.isArray(this.moveHistory) ? [...this.moveHistory] : [];
     return next;
   }
 
@@ -164,9 +167,14 @@ export class Rubik4x4State {
     }
   }
 
-  applyMove(move) {
+  applyMove(move, track = true) {
     const trimmed = move.trim();
     if (!trimmed) return;
+
+    if (track) {
+      if (!this.moveHistory) this.moveHistory = [];
+      this.moveHistory.push(trimmed);
+    }
 
     const match = trimmed.match(/^([0-9]?)([UDFBLRxyzudfblr]|[UDFBLR]w)([2']|'2)?$/);
     if (!match) {
@@ -274,11 +282,11 @@ export class Rubik4x4State {
     }
   }
 
-  applySequence(sequence) {
+  applySequence(sequence, track = true) {
     if (!sequence) return;
     const tokens = sequence.trim().split(/\s+/).filter(Boolean);
     for (const token of tokens) {
-      this.applyMove(token);
+      this.applyMove(token, track);
     }
   }
 
